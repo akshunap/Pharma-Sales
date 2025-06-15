@@ -18,5 +18,4 @@ This project analyzes sales performance data for a fictional pharmaceutical comp
 2. Run the script: `python main.py`
 3. SQLite DB (`pharma_sales.db`) will be created automatically.
 
-## Author
-Built for ZS Associates BTSA role.
+
