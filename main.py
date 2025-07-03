@@ -1,5 +1,4 @@
-
-# Pharma Sales Performance Project - Python + SQL
+# Pharma Sales Performance Project - Using Real CSV Data
 
 # Step 1: Import Libraries
 import pandas as pd
@@ -7,85 +6,52 @@ import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Step 2: Load Datasets (Simulated CSVs)
-sales_data = pd.DataFrame({
-    'region': ['East', 'West', 'East', 'South', 'North', 'West', 'South'],
-    'sales_rep_id': [101, 102, 101, 103, 104, 102, 103],
-    'product': ['A', 'B', 'C', 'A', 'C', 'B', 'A'],
-    'sales_amount': [2000, 1500, 3000, 2500, 1000, 1800, 2700],
-    'date': pd.to_datetime(['2024-01-10', '2024-01-12', '2024-02-05', '2024-02-10', '2024-03-15', '2024-03-18', '2024-04-01'])
-})
-
-rep_info = pd.DataFrame({
-    'sales_rep_id': [101, 102, 103, 104],
-    'rep_name': ['Alice', 'Bob', 'Charlie', 'Diana'],
-    'region': ['East', 'West', 'South', 'North'],
-    'target': [7000, 6000, 8000, 5000]
-})
-
-product_master = pd.DataFrame({
-    'product': ['A', 'B', 'C'],
-    'product_name': ['PainRelief', 'Antibiotic', 'Supplement'],
-    'category': ['OTC', 'Rx', 'OTC']
-})
+# Step 2: Load Dataset from CSV
+sales_data = pd.read_csv("pharma_sales.csv")
+sales_data.columns = sales_data.columns.str.strip().str.lower()  # Normalize column names
+print("Columns in CSV:", sales_data.columns.tolist())
 
 # Step 3: Create SQLite DB and Upload Data
 conn = sqlite3.connect('pharma_sales.db')
-sales_data.to_sql('sales_data', conn, if_exists='replace', index=False)
-rep_info.to_sql('rep_info', conn, if_exists='replace', index=False)
-product_master.to_sql('product_master', conn, if_exists='replace', index=False)
+sales_data.to_sql('pharma_sales', conn, if_exists='replace', index=False)
 
 # Step 4: SQL Queries for Analysis
-print("\n--- Total Sales by Region ---")
-query1 = """
-SELECT region, SUM(sales_amount) AS total_sales
-FROM sales_data
-GROUP BY region;
-"""
-print(pd.read_sql(query1, conn))
+print("\n--- Total Usage of Each Drug Category ---")
+drug_columns = ['m01ab', 'm01ae', 'n02ba', 'n02be', 'n05b', 'n05c', 'r03', 'r06']
+drug_usage = sales_data[drug_columns].sum().reset_index()
+drug_usage.columns = ['drug_category', 'total_usage']
+print(drug_usage)
 
-print("\n--- Top Performing Reps ---")
-query2 = """
-SELECT r.rep_name, SUM(s.sales_amount) AS total_sales
-FROM sales_data s
-JOIN rep_info r ON s.sales_rep_id = r.sales_rep_id
-GROUP BY r.rep_name
-ORDER BY total_sales DESC
-LIMIT 5;
-"""
-print(pd.read_sql(query2, conn))
-
-print("\n--- Monthly Sales by Category ---")
-query3 = """
-SELECT strftime('%Y-%m', s.date) AS month, p.category, SUM(s.sales_amount) AS total
-FROM sales_data s
-JOIN product_master p ON s.product = p.product
-GROUP BY month, p.category
+# Step 5: Monthly Total Drug Usage
+print("\n--- Monthly Total Drug Usage ---")
+query = """
+SELECT month, 
+       SUM(m01ab + m01ae + n02ba + n02be + n05b + n05c + r03 + r06) AS total_usage
+FROM pharma_sales
+GROUP BY month
 ORDER BY month;
 """
-monthly_sales = pd.read_sql(query3, conn)
-print(monthly_sales)
+monthly_usage = pd.read_sql(query, conn)
+print(monthly_usage)
 
-# Step 5: Visualization
+# Step 6: Visualization - Total Usage by Drug Category
 plt.figure(figsize=(10,6))
-sns.barplot(data=monthly_sales, x='month', y='total', hue='category')
-plt.title('Monthly Sales by Product Category')
-plt.xlabel('Month')
-plt.ylabel('Total Sales')
+sns.barplot(data=drug_usage, x='drug_category', y='total_usage')
+plt.title('Total Usage by Drug Category')
+plt.xlabel('Drug Category')
+plt.ylabel('Total Usage')
 plt.tight_layout()
 plt.show()
 
-# Step 6: Performance Comparison
-query4 = """
-SELECT r.rep_name, SUM(s.sales_amount) AS achieved, r.target
-FROM sales_data s
-JOIN rep_info r ON s.sales_rep_id = r.sales_rep_id
-GROUP BY r.rep_name;
-"""
-performance = pd.read_sql(query4, conn)
-performance['% Achievement'] = round((performance['achieved'] / performance['target']) * 100, 2)
-print("\n--- Performance vs Target ---")
-print(performance)
+# Step 7: Monthly Trend of Total Drug Usage
+plt.figure(figsize=(10,6))
+sns.lineplot(data=monthly_usage, x='month', y='total_usage', marker='o')
+plt.title('Monthly Total Drug Usage')
+plt.xlabel('Month')
+plt.ylabel('Total Usage')
+plt.tight_layout()
+plt.show()
 
 # Close the connection
 conn.close()
+
